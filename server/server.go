@@ -12,6 +12,10 @@ import (
 	"syscall"
 )
 
+var (
+	shutdown bool
+)
+
 func Start(port int, tlsCert string, tlsKey string) {
 	serverTLSConf, _, err := zert.TLSSetup(tlsCert, tlsKey)
 	if err != nil {
@@ -26,11 +30,11 @@ func Start(port int, tlsCert string, tlsKey string) {
 		TLSConfig: serverTLSConf,
 	}
 
-	go func() {
-		if err := s.ListenAndServeTLS("", ""); err != nil {
+	go func(shutdown *bool) {
+		if err := s.ListenAndServeTLS("", ""); err != nil && !*shutdown {
 			log.Errorf("Failed to listen and serve: %v", err)
 		}
-	}()
+	}(&shutdown)
 
 	log.Info("Listening for requests on port ", port)
 
@@ -40,6 +44,7 @@ func Start(port int, tlsCert string, tlsKey string) {
 	<-signalChan
 
 	log.Infof("Shutdown gracefully...")
+	shutdown = true
 	if err := s.Shutdown(context.Background()); err != nil {
 		log.Error(err)
 	}
